@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CardioSense – Heart Disease Predictor</title>
+  <meta name="description" content="AI-powered heart disease risk assessment using Support Vector Machine trained on clinical data." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & tokens ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0d14;
+      --surface:   #111827;
+      --card:      #161d2e;
+      --border:    rgba(255,255,255,.07);
+      --accent:    #e54d6a;
+      --accent2:   #ff8c69;
+      --safe:      #22d3a5;
+      --text:      #f1f5f9;
+      --muted:     #8896a8;
+      --input-bg:  #1e2840;
+      --radius:    14px;
+      --glow-red:  0 0 40px rgba(229,77,106,.25);
+      --glow-green:0 0 40px rgba(34,211,165,.25);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background ────────────────────────────────────── */
+    .bg-mesh {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 80vw 60vh at 10% 10%,  rgba(229,77,106,.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60vw 50vh at 90% 80%,  rgba(34,211,165,.08) 0%, transparent 60%),
+        radial-gradient(ellipse 50vw 40vh at 50% 50%,  rgba(99,102,241,.06) 0%, transparent 60%);
+    }
+
+    .orb {
+      position: fixed; border-radius: 50%; filter: blur(90px); opacity:.45; z-index:0;
+      animation: drift 15s ease-in-out infinite alternate;
+    }
+    .orb1 { width:520px; height:520px; top:-180px; left:-160px; background:rgba(229,77,106,.18); animation-delay:0s; }
+    .orb2 { width:400px; height:400px; bottom:-120px; right:-100px; background:rgba(34,211,165,.14); animation-delay:-7s; }
+
+    @keyframes drift {
+      0%   { transform: translate(0,0) scale(1); }
+      100% { transform: translate(40px, 30px) scale(1.05); }
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .wrapper { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      text-align: center;
+      padding: 64px 0 48px;
+    }
+
+    .logo-ring {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 80px; height: 80px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 0 0 12px rgba(229,77,106,.12);
+      margin-bottom: 24px;
+      animation: pulse-ring 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 0 12px rgba(229,77,106,.12); }
+      50%       { box-shadow: 0 0 0 20px rgba(229,77,106,.05); }
+    }
+
+    .logo-ring svg { width: 38px; height: 38px; }
+
+    header h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #fff 30%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      margin-top: 14px;
+      font-size: 1.05rem;
+      color: var(--muted);
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+    }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 20px;
+      background: rgba(229,77,106,.1);
+      border: 1px solid rgba(229,77,106,.25);
+      color: var(--accent2);
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 999px;
+    }
+
+    /* ── Grid layout ─────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 28px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Card ───────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      backdrop-filter: blur(10px);
+    }
+
+    .card-title {
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title::before {
+      content: '';
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* ── Form sections ──────────────────────────────────────────── */
+    .section-label {
+      font-size: .75rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 24px 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    label {
+      font-size: .8rem;
+      font-weight: 500;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    label .tooltip {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px; border-radius: 50%;
+      background: var(--input-bg);
+      color: var(--muted);
+      font-size: .65rem;
+      cursor: help;
+      position: relative;
+    }
+
+    label .tooltip:hover::after {
+      content: attr(data-tip);
+      position: absolute; bottom: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%);
+      background: #1e2840; color: var(--text);
+      font-size: .72rem; font-weight: 400;
+      padding: 6px 10px; border-radius: 8px;
+      white-space: nowrap;
+      border: 1px solid var(--border);
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    input, select {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: .9rem;
+      padding: 11px 14px;
+      transition: border-color .2s, box-shadow .2s;
+      outline: none;
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(229,77,106,.15);
+    }
+
+    input:hover, select:hover {
+      border-color: rgba(255,255,255,.2);
+    }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238896a8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 16px;
+      padding-right: 36px;
+    }
+
+    /* ── Submit button ──────────────────────────────────────────── */
+    .btn-predict {
+      width: 100%;
+      margin-top: 28px;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: transform .15s, box-shadow .2s, opacity .2s;
+      box-shadow: 0 4px 24px rgba(229,77,106,.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-predict::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+
+    .btn-predict:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(229,77,106,.55); }
+    .btn-predict:hover::before { opacity: 1; }
+    .btn-predict:active { transform: translateY(0); }
+    .btn-predict:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+    /* ── Spinner ────────────────────────────────────────────────── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Result panel ───────────────────────────────────────────── */
+    .result-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      position: sticky;
+      top: 32px;
+    }
+
+    .result-idle {
+      text-align: center;
+      padding: 40px 0;
+      color: var(--muted);
+    }
+
+    .result-idle svg { opacity: .35; margin-bottom: 12px; }
+    .result-idle p { font-size: .9rem; }
+
+    /* ── Result card positive/negative ──────────────────────────── */
+    .result-content { display: none; }
+
+    .result-icon {
+      display: flex; align-items: center; justify-content: center;
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+    }
+
+    .result-icon svg { width: 32px; height: 32px; }
+
+    .result-label {
+      text-align: center;
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .result-sub {
+      text-align: center;
+      font-size: .85rem;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+
+    /* Confidence bar */
+    .conf-wrap { margin-top: 8px; }
+    .conf-title { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+    .conf-bar-bg { background: rgba(255,255,255,.07); border-radius: 999px; height: 8px; overflow: hidden; }
+    .conf-bar { height: 100%; border-radius: 999px; transition: width 1s cubic-bezier(.4,0,.2,1); width: 0%; }
+    .conf-val { text-align: right; font-size: .8rem; font-weight: 700; margin-top: 6px; }
+
+    /* Info rows */
+    .info-rows { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; }
+    .info-row {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,.04);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: .83rem;
+    }
+    .info-row .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+    /* ── Stats strip ────────────────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-card .val { font-size: 1.6rem; font-weight: 800; }
+    .stat-card .key { font-size: .72rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .08em; }
+
+    .stat-card:nth-child(1) .val { color: var(--accent); }
+    .stat-card:nth-child(2) .val { color: #a78bfa; }
+    .stat-card:nth-child(3) .val { color: var(--safe); }
+
+    /* ── Footer ─────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding-top: 40px;
+      color: var(--muted);
+      font-size: .8rem;
+    }
+
+    footer span { color: var(--accent); }
+
+    /* ── Animations ─────────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity:0; transform: translateY(20px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+
+    .fade-up { animation: fadeUp .6s ease both; }
+    .delay-1 { animation-delay: .1s; }
+    .delay-2 { animation-delay: .2s; }
+    .delay-3 { animation-delay: .3s; }
+
+    /* ── Responsive tweaks ──────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: 1fr; }
+      .card { padding: 22px 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-mesh"></div>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header class="fade-up">
+    <div class="logo-ring">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        <polyline points="8 14 10 16 16 10" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <h1>CardioSense AI</h1>
+    <p>Clinical-grade heart disease risk assessment powered by a Support Vector Machine trained on 918 patient records.</p>
+    <div class="badge">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
+      SVM Model · 87% Accuracy
+    </div>
+  </header>
+
+  <!-- Stats strip -->
+  <div class="stats fade-up delay-1">
+    <div class="stat-card">
+      <div class="val">918</div>
+      <div class="key">Training records</div>
+    </div>
+    <div class="stat-card">
+      <div class="val">87%</div>
+      <div class="key">Accuracy</div>
+    </div>
+    <div class="stat-card">
+      <div class="val">11</div>
+      <div class="key">Clinical features</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="grid fade-up delay-2">
+
+    <!-- Form card -->
+    <div class="card">
+      <div class="card-title">Patient Information</div>
+
+      <form id="predictForm" novalidate>
+
+        <!-- Demographics -->
+        <div class="section-label">Demographics</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="Age">Age <span class="tooltip" data-tip="Patient age in years">?</span></label>
+            <input type="number" id="Age" name="Age" min="1" max="120" placeholder="e.g. 55" required />
+          </div>
+          <div class="form-group">
+            <label for="Sex">Biological Sex</label>
+            <select id="Sex" name="Sex">
+              <option value="M">Male</option>
+              <option value="F">Female</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Vitals -->
+        <div class="section-label">Vital Signs</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="RestingBP">Resting BP <span class="tooltip" data-tip="Resting blood pressure (mm Hg)">?</span></label>
+            <input type="number" id="RestingBP" name="RestingBP" min="50" max="250" placeholder="e.g. 130" required />
+          </div>
+          <div class="form-group">
+            <label for="Cholesterol">Cholesterol <span class="tooltip" data-tip="Serum cholesterol (mg/dl)">?</span></label>
+            <input type="number" id="Cholesterol" name="Cholesterol" min="0" max="600" placeholder="e.g. 250" required />
+          </div>
+          <div class="form-group">
+            <label for="MaxHR">Max Heart Rate <span class="tooltip" data-tip="Maximum heart rate achieved (bpm)">?</span></label>
+            <input type="number" id="MaxHR" name="MaxHR" min="40" max="250" placeholder="e.g. 150" required />
+          </div>
+          <div class="form-group">
+            <label for="FastingBS">Fasting Blood Sugar <span class="tooltip" data-tip="> 120 mg/dl?">?</span></label>
+            <select id="FastingBS" name="FastingBS">
+              <option value="0">Normal (≤ 120 mg/dl)</option>
+              <option value="1">High (&gt; 120 mg/dl)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Cardiac -->
+        <div class="section-label">Cardiac Assessment</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="ChestPainType">Chest Pain Type</label>
+            <select id="ChestPainType" name="ChestPainType">
+              <option value="ATA">Atypical Angina (ATA)</option>
+              <option value="NAP">Non-Anginal Pain (NAP)</option>
+              <option value="ASY">Asymptomatic (ASY)</option>
+              <option value="TA">Typical Angina (TA)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="RestingECG">Resting ECG</label>
+            <select id="RestingECG" name="RestingECG">
+              <option value="Normal">Normal</option>
+              <option value="ST">ST-T Wave Abnormality</option>
+              <option value="LVH">Left Ventricular Hypertrophy</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="ExerciseAngina">Exercise Angina <span class="tooltip" data-tip="Angina induced by exercise">?</span></label>
+            <select id="ExerciseAngina" name="ExerciseAngina">
+              <option value="N">No</option>
+              <option value="Y">Yes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="ST_Slope">ST Slope <span class="tooltip" data-tip="Slope of the peak exercise ST segment">?</span></label>
+            <select id="ST_Slope" name="ST_Slope">
+              <option value="Up">Upsloping</option>
+              <option value="Flat">Flat</option>
+              <option value="Down">Downsloping</option>
+            </select>
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label for="Oldpeak">ST Depression (Oldpeak) <span class="tooltip" data-tip="ST depression relative to rest">?</span></label>
+            <input type="number" id="Oldpeak" name="Oldpeak" step="0.1" min="-3" max="7" placeholder="e.g. 1.5" required />
+          </div>
+        </div>
+
+        <button type="submit" class="btn-predict" id="submitBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+          <span id="btnText">Analyze Risk</span>
+          <div class="spinner" id="spinner"></div>
+        </button>
+
+      </form>
+    </div>
+
+    <!-- Result panel -->
+    <div class="result-panel">
+      <div class="card-title">Risk Assessment</div>
+
+      <div class="result-idle" id="idleState">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 8v4l3 3"/>
+        </svg>
+        <p>Fill in the patient details<br>and click <strong>Analyze Risk</strong></p>
+      </div>
+
+      <div class="result-content" id="resultContent">
+        <div class="result-icon" id="resultIcon"></div>
+        <div class="result-label" id="resultLabel"></div>
+        <div class="result-sub" id="resultSub"></div>
+
+        <div class="conf-wrap">
+          <div class="conf-title">Model Confidence</div>
+          <div class="conf-bar-bg">
+            <div class="conf-bar" id="confBar"></div>
+          </div>
+          <div class="conf-val" id="confVal"></div>
+        </div>
+
+        <div class="info-rows" id="infoRows"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="fade-up delay-3">
+    Built with <span>♥</span> · SVM classifier · For educational purposes only — not a substitute for professional medical advice.
+  </footer>
+
+</div>
+
+<script>
+  const form        = document.getElementById('predictForm');
+  const submitBtn   = document.getElementById('submitBtn');
+  const btnText     = document.getElementById('btnText');
+  const spinner     = document.getElementById('spinner');
+  const idleState   = document.getElementById('idleState');
+  const resultContent = document.getElementById('resultContent');
+  const resultIcon  = document.getElementById('resultIcon');
+  const resultLabel = document.getElementById('resultLabel');
+  const resultSub   = document.getElementById('resultSub');
+  const confBar     = document.getElementById('confBar');
+  const confVal     = document.getElementById('confVal');
+  const infoRows    = document.getElementById('infoRows');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Collect form data
+    const data = Object.fromEntries(new FormData(form).entries());
+
+    // Loading state
+    submitBtn.disabled = true;
+    btnText.textContent = 'Analyzing…';
+    spinner.style.display = 'block';
+
+    try {
+      const res  = await fetch('/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      const json = await res.json();
+
+      if (json.error) throw new Error(json.error);
+
+      showResult(json, data);
+
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      submitBtn.disabled = false;
+      btnText.textContent = 'Analyze Risk';
+      spinner.style.display = 'none';
+    }
+  });
+
+  function showResult(json, data) {
+    const positive = json.prediction === 1;
+    const color    = positive ? '#e54d6a' : '#22d3a5';
+    const glow     = positive ? '0 0 40px rgba(229,77,106,.35)' : '0 0 40px rgba(34,211,165,.3)';
+
+    idleState.style.display = 'none';
+    resultContent.style.display = 'block';
+
+    // Icon
+    resultIcon.style.background  = positive ? 'rgba(229,77,106,.15)' : 'rgba(34,211,165,.12)';
+    resultIcon.style.boxShadow   = glow;
+    resultIcon.innerHTML = positive
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+
+    // Label
+    resultLabel.style.color = color;
+    resultLabel.textContent = json.label;
+
+    // Subtext
+    resultSub.textContent = positive
+      ? 'High-risk indicators detected. Please consult a cardiologist.'
+      : 'Low-risk profile based on the provided data.';
+
+    // Confidence bar
+    const conf = json.confidence;
+    const barColor = positive
+      ? `linear-gradient(90deg, #e54d6a, #ff8c69)`
+      : `linear-gradient(90deg, #22d3a5, #67e8f9)`;
+
+    confBar.style.background = barColor;
+    setTimeout(() => { confBar.style.width = conf + '%'; }, 50);
+    confVal.style.color   = color;
+    confVal.textContent   = conf + '%';
+
+    // Info rows
+    const tips = positive ? [
+      { dot: '#e54d6a', text: 'Irregular ST segment or exercise angina may be contributing factors.' },
+      { dot: '#ff8c69', text: 'Cholesterol and resting BP levels should be monitored closely.' },
+      { dot: '#fbbf24', text: 'Recommend follow-up ECG and stress test.' },
+    ] : [
+      { dot: '#22d3a5', text: 'Vital signs appear within normal clinical ranges.' },
+      { dot: '#67e8f9', text: 'Continue regular cardiovascular checkups.' },
+      { dot: '#a78bfa', text: 'Maintain a healthy diet and exercise regimen.' },
+    ];
+
+    infoRows.innerHTML = tips.map(t =>
+      `<div class="info-row"><div class="dot" style="background:${t.dot}"></div>${t.text}</div>`
+    ).join('');
+  }
+
+  function showError(msg) {
+    idleState.style.display = 'none';
+    resultContent.style.display = 'block';
+
+    resultIcon.style.background = 'rgba(251,191,36,.1)';
+    resultIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+    resultLabel.style.color = '#fbbf24';
+    resultLabel.textContent = 'Prediction Error';
+    resultSub.textContent   = msg;
+    confBar.style.width     = '0%';
+    infoRows.innerHTML      = '';
+  }
+</script>
+
+</body>
+</html>
